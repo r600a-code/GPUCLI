@@ -86,6 +86,11 @@ This skill supports the full CFGPU API:
 3. Make your changes
 4. Submit a pull request
 
+## 联系方式
+
+- 微信：`wwwr600a`
+- Twitter/X：[@ADfunAI](https://x.com/ADfunAI)
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
