@@ -1,11 +1,11 @@
 ---
 name: cfgpu-api
-description: Manage GPU cloud instances on CFGPU platform. Use when you need to create, manage, or query GPU instances, regions, GPU types, or images on CFGPU cloud platform.
+description: Manage GPU cloud instances on CFGPU platform. Includes GPU Sniper for auto-detecting and grabbing available GPU resources.
 ---
 
 # CFGPU API Skill
 
-Manage GPU cloud instances on CFGPU (https://cfgpu.com) platform.
+Manage GPU cloud instances on CFGPU (https://cfgpu.com) platform. Includes **GPU Sniper** for auto-detecting and grabbing available GPU resources.
 
 ## When to Use
 
@@ -17,39 +17,79 @@ Use this skill immediately when the user asks any of:
 - "start/stop/release GPU instance"
 - "query available GPU types/regions"
 - "manage CFGPU cloud resources"
+- **"抢卡" / "gpu-sniper" / "有没有卡" / "监控GPU" / "GPU有货吗"**
 
 ## Quick Start
 
 ### Prerequisites
 
-1. **API Token**: Get your API token from CFGPU platform
-2. **Environment Variable**: Set `CFGPU_API_TOKEN` environment variable
-   ```bash
-   export CFGPU_API_TOKEN="YOUR_API_TOKEN"
-   ```
+1. **API Token**: Get your API token from [CFGPU platform](https://cfgpu.com)
+2. Token will be auto-saved on first run — no manual config needed
 
-### Basic Usage Examples
+### Basic Usage
 
 ```bash
 # List available regions
-curl -H "Authorization: $CFGPU_API_TOKEN" https://api.cfgpu.com/userapi/v1/region/list
+./scripts/cfgpu-helper.sh list-regions
 
 # List available GPU types
-curl -H "Authorization: $CFGPU_API_TOKEN" https://api.cfgpu.com/userapi/v1/gpu/list
+./scripts/cfgpu-helper.sh list-gpus
 
-# Create a GPU instance
-curl -X POST -H "Authorization: $CFGPU_API_TOKEN" -H "Content-Type: application/json" \
-  -d '{
-    "priceType": "Day",
-    "regionCode": "hz",
-    "gpuType": "qnid2x6c",
-    "gpuNum": 1,
-    "expandSize": 1,
-    "imageId": "image_xxxx",
-    "serviceTime": 1,
-    "instanceName": "My GPU Instance"
-  }' \
-  https://api.cfgpu.com/userapi/v1/instance/create
+# Interactive instance creation
+./scripts/cfgpu-helper.sh quick-create
+```
+
+## GPU Sniper (抢卡功能)
+
+### Quick Probe — 一次性扫描所有资源
+
+```bash
+./scripts/probe.sh
+```
+
+输出所有 region × GPU 的可用性表格：
+
+```
+            RTX 4090      H800          L40S          A100-PCIe
+杭州        无货          无货          无货          无货
+重庆        无货          无货          无货          无货
+绍兴        ✅ 有货       无货          无货          无货
+```
+
+### Auto Sniper — 持续监控，有卡就抢
+
+```bash
+./scripts/gpu-sniper.sh
+```
+
+每 30 秒轮询所有 region + GPU 组合，发现有卡自动创建实例：
+
+```
+[16:08:16] #1 RTX 4090 @ 杭州 ... 无货
+[16:08:16] #1 H800 @ 杭州 ... 无货
+[16:08:17] #1 RTX 4090 @ 绍兴 ...
+═══════════════════════════════════════
+  🎉 抢到了!
+  GPU: RTX 4090 x1
+  区域: 绍兴
+  实例ID: instance-xxxxx
+═══════════════════════════════════════
+```
+
+### Sniper Options
+
+```bash
+# 自定义轮询间隔（默认30秒）
+./scripts/gpu-sniper.sh --interval 10
+
+# 指定 GPU 数量
+./scripts/gpu-sniper.sh --gpu-num 2
+
+# 指定镜像
+./scripts/gpu-sniper.sh --image image_xxxx
+
+# 探测模式（只看不抢）
+./scripts/probe.sh
 ```
 
 ## API Reference
@@ -76,275 +116,75 @@ All responses follow this format:
 
 ### Error Codes
 
-Common error codes to handle:
-
 | Code | Message | Action |
 |------|---------|--------|
 | 10001 | 请求参数错误 | Check request parameters |
 | 50001 | 余额不足 | Add funds to account |
 | 51001 | 资源不足 | Try different region/GPU type |
 | 51002 | GPU不足 | Reduce GPU count or wait |
-| 52001 | 余额不足1小时 | Add funds immediately |
+| BIZ_ERROR | 当前主机可用资源不足 [显卡] | GPU not available, keep polling |
 
 ## Core Operations
 
 ### 1. Region Management
 
-**List Regions**
 ```bash
 GET /userapi/v1/region/list
 ```
 
-Response:
-```json
-[
-  {
-    "code": "hz",
-    "name": "杭州"
-  }
-]
-```
-
 ### 2. GPU Type Management
 
-**List GPU Types**
 ```bash
 GET /userapi/v1/gpu/list
 ```
 
-Response:
-```json
-[
-  {
-    "code": "qnid2x6c",
-    "name": "RTX 4090"
-  }
-]
-```
+### 3. Instance Management
 
-### 3. Image Management
-
-**List User Images**
 ```bash
-GET /userapi/v1/image/privateList?adaptType=VM
-```
-
-**List System Images**
-```bash
-GET /userapi/v1/image/systemList?adaptType=VM
-```
-
-### 4. Instance Management
-
-**Create Instance**
-```bash
+# Create
 POST /userapi/v1/instance/create
-```
 
-Required parameters:
-```json
-{
-  "regionCode": "string",
-  "gpuType": "string",
-  "gpuNum": 1,
-  "imageId": "string",
-  "priceType": "Day|Week|Month|Usage",
-  "serviceTime": 1
-}
-```
-
-**Get Instance Status**
-```bash
+# Status
 GET /userapi/v1/instance/{instanceId}/status
-```
 
-**Get All Instance Status**
-```bash
+# All instances
 GET /userapi/v1/instance/status
-```
 
-**Start Instance**
-```bash
+# Start / Stop / Release
 POST /userapi/v1/instance/{instanceId}/start
-```
-
-**Stop Instance**
-```bash
 POST /userapi/v1/instance/{instanceId}/stop
-```
-
-**Release Instance**
-```bash
 POST /userapi/v1/instance/{instanceId}/release
-```
 
-**Change Instance Image**
-```bash
+# Change image
 POST /userapi/v1/instance/{instanceId}/changeImage
-```
 
-**Query Instances (Paginated)**
-```bash
+# Query (paginated)
 POST /userapi/v1/instance/page
 ```
 
-## Usage Patterns
+## Scripts Overview
 
-### Pattern 1: Quick Instance Creation
+| Script | Description |
+|--------|-------------|
+| `gpu-sniper.sh` | **GPU 抢卡** — 持续轮询，有卡自动创建实例 |
+| `probe.sh` | **资源探测** — 一次性扫描，输出可用性表格 |
+| `cfgpu-helper.sh` | Main CLI tool for all operations |
+| `setup-env.sh` | Interactive environment setup |
+| `check-config.sh` | Configuration validation |
+| `example-usage.sh` | Usage examples |
 
-```bash
-# 1. Check available regions
-REGIONS=$(curl -s -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/region/list)
+## Security Notes
 
-# 2. Check available GPU types
-GPUS=$(curl -s -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/gpu/list)
+- **Never commit API tokens** to version control
+- **Use environment variables** or secure token files (`~/.cfgpu/token`)
+- **Set appropriate permissions** on token files (`chmod 600`)
+- **Regularly rotate API tokens** for security
 
-# 3. Create instance
-curl -X POST -H "Authorization: $CFGPU_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "priceType": "Day",
-    "regionCode": "hz",
-    "gpuType": "qnid2x6c",
-    "gpuNum": 1,
-    "imageId": "image_exc6f72b",
-    "serviceTime": 1,
-    "instanceName": "AI-Training-Instance"
-  }' \
-  https://api.cfgpu.com/userapi/v1/instance/create
-```
+## 联系方式
 
-### Pattern 2: Instance Lifecycle Management
+- 微信：`wwwr600a`
+- Twitter/X：[@ADfunAI](https://x.com/ADfunAI)
 
-```bash
-# Create instance
-INSTANCE_ID=$(curl -s -X POST -H "Authorization: $CFGPU_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"priceType": "Day", "regionCode": "hz", "gpuType": "qnid2x6c", "gpuNum": 1, "imageId": "image_xxxx", "serviceTime": 1}' \
-  https://api.cfgpu.com/userapi/v1/instance/create | jq -r '.content.instanceId')
+## License
 
-# Check status
-curl -s -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/instance/$INSTANCE_ID/status
-
-# Stop instance when done
-curl -s -X POST -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/instance/$INSTANCE_ID/stop
-
-# Release instance
-curl -s -X POST -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/instance/$INSTANCE_ID/release
-```
-
-### Pattern 3: Cost Monitoring
-
-```bash
-# Check all instances
-ALL_INSTANCES=$(curl -s -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/instance/status)
-
-# Filter running instances
-RUNNING_INSTANCES=$(echo "$ALL_INSTANCES" | jq -r '.[] | select(.statusCode == "RUNNING") | .instanceId')
-
-# Calculate estimated cost
-# (Based on GPU type, duration, and pricing model)
-```
-
-## Best Practices
-
-### 1. Cost Optimization
-
-- **Use spot/preemptible instances** when available
-- **Monitor usage** and stop instances when not in use
-- **Choose appropriate GPU type** for your workload
-- **Set up auto-shutdown** for long-running tasks
-
-### 2. Resource Management
-
-- **Check resource availability** before creating instances
-- **Use appropriate disk sizes** (30GB system disk, 50GB data disk free)
-- **Monitor GPU memory usage**
-- **Clean up unused instances** to avoid unnecessary charges
-
-### 3. Security
-
-- **Keep API tokens secure** (use environment variables)
-- **Regularly rotate API tokens**
-- **Monitor instance access logs**
-- **Use secure images** from trusted sources
-
-## Troubleshooting
-
-### Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| Authentication failed | Check API token validity and format |
-| Insufficient balance | Add funds to your CFGPU account |
-| Resource unavailable | Try different region or GPU type |
-| Instance creation failed | Check all required parameters |
-| Instance not starting | Check instance status and logs |
-
-### Debugging Commands
-
-```bash
-# Test API connectivity
-curl -I -H "Authorization: $CFGPU_API_TOKEN" \
-  https://api.cfgpu.com/userapi/v1/region/list
-
-# Check account balance (if endpoint available)
-# curl -H "Authorization: $CFGPU_API_TOKEN" \
-#   https://api.cfgpu.com/userapi/v1/account/balance
-
-# View instance logs (if endpoint available)
-# curl -H "Authorization: $CFGPU_API_TOKEN" \
-#   https://api.cfgpu.com/userapi/v1/instance/{instanceId}/logs
-```
-
-## Integration Examples
-
-### With AI Workloads
-
-```bash
-# Create instance for AI training
-INSTANCE_ID=$(create_gpu_instance \
-  --gpu-type "RTX 4090" \
-  --gpu-num 2 \
-  --image "pytorch-latest" \
-  --duration 24h)
-
-# Setup AI environment
-setup_ai_environment $INSTANCE_ID
-
-# Run training job
-run_training_job $INSTANCE_ID --model "llama-3b" --dataset "custom"
-
-# Monitor and stop
-monitor_training $INSTANCE_ID
-stop_instance $INSTANCE_ID
-```
-
-### With CI/CD Pipeline
-
-```bash
-# In CI/CD script
-if [ "$NEEDS_GPU" = "true" ]; then
-  INSTANCE_ID=$(create_gpu_instance --duration 2h)
-  run_gpu_tests $INSTANCE_ID
-  capture_results $INSTANCE_ID
-  release_instance $INSTANCE_ID
-fi
-```
-
-## Related Resources
-
-- [CFGPU Platform](https://cfgpu.com)
-- [API Documentation](https://doc.cfgpu.com/API文档/APIToken认证/)
-- [Pricing Information](https://cfgpu.com/pricing)
-- [Support & Community](https://cfgpu.com/support)
-
----
-
-**Note**: This skill provides guidance for using CFGPU API. Actual implementation may require additional error handling, retry logic, and security considerations based on your specific use case.
+MIT License - see [LICENSE](LICENSE) file for details.

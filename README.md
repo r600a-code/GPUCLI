@@ -1,9 +1,11 @@
 # CFGPU API Skill for OpenClaw
 
-A comprehensive OpenClaw skill for managing GPU cloud instances on CFGPU platform.
+A comprehensive OpenClaw skill for managing GPU cloud instances on CFGPU platform. Includes **GPU Sniper** for auto-detecting and grabbing available GPU resources.
 
 ## Features
 
+- **GPU Sniper**: Auto-poll all regions and GPU types, grab resources when available
+- **Resource Probe**: One-shot scan showing availability table across all regions/GPUs
 - **Resource Management**: List available regions, GPU types, and system images
 - **Instance Lifecycle**: Create, start, stop, release GPU instances
 - **Image Management**: List and manage system/user images
@@ -14,48 +16,71 @@ A comprehensive OpenClaw skill for managing GPU cloud instances on CFGPU platfor
 
 ### Option 1: Install via ClawHub
 ```bash
-# Once published to ClawHub
 clawhub install cfgpu-api
 ```
 
 ### Option 2: Manual Installation
-1. Clone this repository
-2. Copy the `cfgpu-api` folder to your OpenClaw skills directory:
-   ```bash
-   cp -r cfgpu-api ~/.openclaw/workspace/skills/
-   ```
+```bash
+git clone https://github.com/r600a-code/GPUCLI.git
+cd GPUCLI
+chmod +x scripts/*.sh
+```
 
 ## Quick Start
 
-### 1. Get API Token
-Obtain your API token from [CFGPU Platform](https://cfgpu.com).
+No manual configuration needed. Just run and the script will prompt for your API token on first use.
 
-### 2. Configure Authentication
 ```bash
-# Set environment variable
-export CFGPU_API_TOKEN="YOUR_API_TOKEN"
+# Quick probe — see what's available right now
+./scripts/probe.sh
 
-# Or create token file
-echo "YOUR_API_TOKEN" > ~/.cfgpu/token
-chmod 600 ~/.cfgpu/token
+# Auto sniper — keep polling and grab when available
+./scripts/gpu-sniper.sh
 ```
 
-### 3. Basic Usage
+## GPU Sniper
+
+### Probe Mode (一次性扫描)
+
 ```bash
-# List available regions
-./scripts/cfgpu-helper.sh list-regions
+./scripts/probe.sh
+```
 
-# List available GPU types
-./scripts/cfgpu-helper.sh list-gpus
+Scans all region × GPU combinations and outputs a table:
 
-# Interactive instance creation
-./scripts/cfgpu-helper.sh quick-create
+```
+            RTX 4090      H800          L40S          A100-PCIe
+杭州        无货          无货          无货          无货
+重庆        无货          无货          无货          无货
+绍兴        ✅ 有货       无货          无货          无货
+```
+
+### Sniper Mode (持续监控抢卡)
+
+```bash
+./scripts/gpu-sniper.sh                    # 默认30秒轮询
+./scripts/gpu-sniper.sh --interval 10      # 10秒轮询
+./scripts/gpu-sniper.sh --gpu-num 2        # 抢2卡
+```
+
+When a GPU becomes available:
+
+```
+═══════════════════════════════════════
+  🎉 抢到了!
+  GPU: RTX 4090 x1
+  区域: 绍兴
+  实例ID: instance-xxxxx
+  价格模式: Day | 时长: 1
+═══════════════════════════════════════
 ```
 
 ## Scripts Overview
 
 | Script | Description |
 |--------|-------------|
+| `gpu-sniper.sh` | **GPU 抢卡** — 持续轮询，有卡自动创建实例 |
+| `probe.sh` | **资源探测** — 一次性扫描，输出可用性表格 |
 | `cfgpu-helper.sh` | Main CLI tool for all operations |
 | `setup-env.sh` | Interactive environment setup |
 | `check-config.sh` | Configuration validation |
@@ -71,6 +96,7 @@ This skill supports the full CFGPU API:
 - ✅ Instance lifecycle (create/start/stop/release)
 - ✅ Instance status monitoring
 - ✅ Paginated instance queries
+- ✅ **GPU resource detection and auto-grab**
 
 ## Security Notes
 
@@ -86,10 +112,10 @@ This skill supports the full CFGPU API:
 3. Make your changes
 4. Submit a pull request
 
-## 联系方式
+## Contact
 
-- 微信：`wwwr600a`
-- Twitter/X：[@ADfunAI](https://x.com/ADfunAI)
+- WeChat: `wwwr600a`
+- Twitter/X: [@ADfunAI](https://x.com/ADfunAI)
 
 ## License
 
@@ -99,10 +125,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - [CFGPU Platform](https://cfgpu.com)
 - [OpenClaw Documentation](https://docs.openclaw.ai)
-- [GitHub Issues](https://github.com/yourusername/cfgpu-api-skill/issues)
-
-## Acknowledgments
-
-- CFGPU for providing the GPU cloud platform
-- OpenClaw community for the skill ecosystem
-- Contributors and users
+- [GitHub Issues](https://github.com/r600a-code/GPUCLI/issues)
